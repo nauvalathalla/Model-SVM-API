@@ -1,221 +1,184 @@
-# Model-SVM-API
+# 🚀 OCSVM Anomaly Detection API -- Integration Guide (Android)
 
-# 🐛 IoT Anomaly Detection System (One-Class SVM)
-Sistem ini mendeteksi anomali dari data sensor (mis. suhu, kelembapan, pH, oksigen, turbidity) menggunakan model **One-Class SVM (OCSVM)**. Proyek ini dirancang untuk integrasi dengan **IoT** dan **Aplikasi Android**, terutama untuk monitoring maggot farm, biopond, atau sistem lingkungan lainnya.
+Repositori ini berisi layanan backend untuk melakukan **anomaly
+detection** menggunakan **One-Class SVM (OCSVM)**. Backend ini
+menyediakan **REST API** agar aplikasi Android dapat mengambil hasil
+prediksi dan menampilkannya di UI.
 
----
+------------------------------------------------------------------------
 
-## 🚀 Fitur Utama
-- Training model OCSVM menggunakan data dummy.
-- Prediksi status sensor: `normal` atau `anomaly`.
-- Skor confidence dari model.
-- API berbasis **FastAPI**.
-- Endpoint siap pakai untuk Android (Kotlin + Retrofit).
-- Mudah di-deploy ke server lokal atau cloud.
+## 📌 Fitur Utama
 
----
+-   Machine Learning dengan **One-Class SVM (OCSVM)**
+-   API prediksi menggunakan **FastAPI**
+-   Penyimpanan hasil model ke **PostgreSQL**
+-   Scheduler untuk pengecekan berkala
+-   Siap diintegrasikan ke aplikasi Android / Kotlin
 
-## 📁 Struktur Project
-.
-├── ocsvm_anomaly_fastapi.py
-├── ocsvm_maggot.pkl # Hasil model
-├── README.md
-└── requirements.txt
+------------------------------------------------------------------------
 
-yaml
-Copy code
+# 🏗️ Arsitektur Singkat
 
----
+    Android App → FastAPI Server → OCSVM Model → PostgreSQL
 
-## 🔧 Instalasi & Menjalankan Server
+Android hanya perlu **memanggil endpoint** dan menampilkan response.
 
-### 1. Clone repository
-```bash
-git clone <repository-url>
-cd anomaly-detection
-2. Install dependencies
-bash
-Copy code
+------------------------------------------------------------------------
+
+# ⚙️ 1. Cara Menjalankan Backend
+
+## Install Dependency
+
+``` bash
 pip install -r requirements.txt
-3. Jalankan FastAPI server
-bash
-Copy code
-uvicorn ocsvm_anomaly_fastapi:app --reload
-4. Buka Dokumentasi API
-arduino
-Copy code
-http://127.0.0.1:8000/docs
-📡 API Documentation
-▶️ POST /predict
-Prediksi status data sensor.
+```
 
-Request Body
-json
-Copy code
+## Jalankan Server
+
+``` bash
+uvicorn main:app --reload
+```
+
+Server akan berjalan di:
+
+    http://localhost:8000
+
+------------------------------------------------------------------------
+
+# 📡 2. Endpoint API
+
+## 🔎 **1. Prediksi Data**
+
+**POST** `/predict`
+
+**Body (JSON):**
+
+``` json
 {
-  "temperature": 31.2,
-  "ph": 7.5,
-  "turbidity": 2.1,
-  "oxygen": 4.8
+  "value": 12.5
 }
-Response
-Normal:
+```
 
-json
-Copy code
+**Response:**
+
+``` json
 {
   "status": "normal",
-  "score": 0.12,
-  "timestamp": "2025-11-28T02:15:00Z"
+  "score": 0.23
 }
-Anomaly:
+```
 
-json
-Copy code
+------------------------------------------------------------------------
+
+## 📥 **2. Ambil Hasil Prediksi Terakhir**
+
+**GET** `/latest`
+
+**Response:**
+
+``` json
 {
+  "timestamp": "2025-11-28T13:20:00",
+  "value": 12.5,
   "status": "anomaly",
-  "score": -0.55,
-  "timestamp": "2025-11-28T02:15:00Z"
+  "score": -0.4
 }
-▶️ POST /train?samples=1000
-Melatih ulang model menggunakan data dummy.
+```
 
-Response:
-json
-Copy code
-{
-  "message": "Model retrained",
-  "model_path": "ocsvm_maggot.pkl"
-}
-▶️ GET /status/latest
-Mengambil status prediksi terbaru.
+------------------------------------------------------------------------
 
-Response jika belum ada data:
-json
-Copy code
-{
-  "message": "No analysis yet"
-}
-🤖 Cara Kerja One-Class SVM
-Model OCSVM dilatih hanya menggunakan data normal supaya model dapat mengenali pola normal tersebut.
-Jika ada titik data yang berada di luar boundary model → dianggap anomaly.
+# 📱 3. Cara Integrasi ke Android (Kotlin)
 
-📱 Integrasi ke Android (Kotlin + Retrofit)
-1️⃣ Tambahkan Dependency di build.gradle
-gradle
-Copy code
+## Tambahkan Dependency
+
+``` gradle
 implementation("com.squareup.retrofit2:retrofit:2.9.0")
 implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-2️⃣ Data Class
-kotlin
-Copy code
-data class SensorRequest(
-    val temperature: Double,
-    val ph: Double,
-    val turbidity: Double,
-    val oxygen: Double
-)
+```
 
-data class PredictionResponse(
-    val status: String,
-    val score: Double,
-    val timestamp: String
-)
-3️⃣ Retrofit Interface
-kotlin
-Copy code
+------------------------------------------------------------------------
+
+# 🔧 API Client (Retrofit)
+
+``` kotlin
 interface ApiService {
+    @GET("latest")
+    suspend fun getLatestStatus(): LatestResponse
+
     @POST("predict")
-    suspend fun predict(@Body request: SensorRequest): PredictionResponse
+    suspend fun predict(@Body body: PredictBody): PredictResponse
 }
-4️⃣ Retrofit Client
-kotlin
-Copy code
-object ApiClient {
-    private const val BASE_URL = "http://192.168.1.10:8000/"
 
-    val instance: ApiService by lazy {
-        Retrofit.Builder()
-            .baseUrl(BASE_URL)
-            .addConverterFactory(GsonConverterFactory.create())
-            .build()
-            .create(ApiService::class.java)
-    }
-}
-5️⃣ Memanggil API di Activity/ViewModel
-kotlin
-Copy code
-CoroutineScope(Dispatchers.IO).launch {
+data class LatestResponse(
+    val timestamp: String,
+    val value: Double,
+    val status: String,
+    val score: Double
+)
+
+data class PredictBody(val value: Double)
+
+data class PredictResponse(
+    val status: String,
+    val score: Double
+)
+```
+
+------------------------------------------------------------------------
+
+# 📲 Cara Menampilkan Data di UI
+
+``` kotlin
+viewModelScope.launch {
     try {
-        val request = SensorRequest(
-            temperature = 31.0,
-            ph = 7.2,
-            turbidity = 1.8,
-            oxygen = 5.0
-        )
-
-        val response = ApiClient.instance.predict(request)
-
-        withContext(Dispatchers.Main) {
-            if (response.status == "anomaly") {
-                showAnomalyUI(response.score)
-            } else {
-                showNormalUI()
-            }
-        }
-
+        val result = api.getLatestStatus()
+        _state.value = "Status: ${result.status}\nScore: ${result.score}"
     } catch (e: Exception) {
-        e.printStackTrace()
+        _state.value = "Error: ${e.message}"
     }
 }
-6️⃣ Contoh UI Handler
-kotlin
-Copy code
-fun showAnomalyUI(score: Double) {
-    statusText.text = "⚠️ Anomaly Detected"
-    statusText.setTextColor(Color.RED)
-    scoreText.text = "Score: $score"
+```
+
+------------------------------------------------------------------------
+
+# 🖼️ Contoh Tampilan di Jetpack Compose
+
+``` kotlin
+@Composable
+fun StatusCard(state: String) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Text(
+            text = state,
+            modifier = Modifier.padding(16.dp),
+            style = MaterialTheme.typography.bodyLarge
+        )
+    }
 }
+```
 
-fun showNormalUI() {
-    statusText.text = "✔ Normal"
-    statusText.setTextColor(Color.GREEN)
-}
-🌐 Catatan untuk Developer Android
-Device Android & API server harus berada pada jaringan yang sama jika testing lokal.
+------------------------------------------------------------------------
 
-Ganti BASE_URL sesuai IP server.
+# 📦 Struktur Repository
 
-Pastikan IoT mengirim data sesuai format JSON API.
+    ├── main.py
+    ├── ocsvm.py
+    ├── scheduler.py
+    ├── requirements.txt
+    └── README.md
 
-💡 Tambahan (Opsional)
-Jika ingin, bisa ditambahkan:
+------------------------------------------------------------------------
 
-Logging history ke database
+# 🤝 Kontribusi
 
-Dashboard web (grafik anomali)
+Pull Request sangat diterima.
 
-Deployment ke cloud (Railway/Fly.io/VPS)
+------------------------------------------------------------------------
 
-WebSocket untuk live data
+# 📬 Kontak
 
-📄 Lisensi
-Proyek ini bebas digunakan untuk riset, edukasi, dan pengembangan aplikasi IoT.
-
-❤️ Kontribusi
-Pull request sangat diterima.
-Silakan buka issue jika menemukan bug atau ingin menambahkan fitur baru.
-
-yaml
-Copy code
-
----
-
-Kalau kamu mau, aku bisa buatkan:
-
-✅ README versi bahasa Indonesia  
-✅ Tambahkan arsitektur diagram (ASCII atau gambar)  
-✅ Tambahkan tutorial deploy ke cloud  
-✅ Tambahkan contoh integrasi Jetpack Compose  
-
-Mau ditambah apa?
+Nauval Yusriya Athalla
